@@ -33,7 +33,7 @@ module Motion; module Project;
     variable :icon, :copyright, :category,
         :embedded_frameworks, :external_frameworks,
         :codesign_for_development, :codesign_for_release,
-        :eval_support
+        :eval_support, :cli
 
     def initialize(project_dir, build_mode)
       super
@@ -44,6 +44,7 @@ module Motion; module Project;
       @codesign_for_development = false
       @codesign_for_release = true
       @eval_support = false
+      @cli = false
     end
 
     def platforms; ['MacOSX']; end
@@ -168,7 +169,7 @@ module Motion; module Project;
         Util::Version.new(osx_version) <= Util::Version.new(vers) && File.exist?(datadir(vers))
       }
     end
-    
+
     def osx_version
       `sw_vers -productVersion`.strip.match(/((\d+).(\d+))/)[0]
     end
@@ -230,15 +231,24 @@ EOS
     end
     main_txt << <<EOS
     RubyMotionInit(argc, argv);
-    NSApplication *app = [NSApplication sharedApplication];
-    [app setDelegate:[NSClassFromString(@"#{delegate_class}") new]];
+    id delegate = [NSClassFromString(@"#{delegate_class}") new];
 EOS
+    if cli
+      main_txt << "[delegate main];\n"
+    else
+      main_txt << <<EOS
+    NSApplication *app = [NSApplication sharedApplication];
+    [app setDelegate:delegate];
+EOS
+    end
     if spec_mode
       main_txt << "SpecLauncher *specLauncher = [[SpecLauncher alloc] init];\n"
       main_txt << "[[NSNotificationCenter defaultCenter] addObserver:specLauncher selector:@selector(appLaunched:) name:NSApplicationDidFinishLaunchingNotification object:nil];\n"
     end
+    unless cli
+      main_txt << "NSApplicationMain(argc, (const char **)argv);\n"
+    end
     main_txt << <<EOS
-    NSApplicationMain(argc, (const char **)argv);
     [pool release];
     rb_exit(0);
     return 0;
