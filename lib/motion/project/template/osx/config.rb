@@ -234,7 +234,14 @@ EOS
     id delegate = [NSClassFromString(@"#{delegate_class}") new];
 EOS
     if cli
-      main_txt << "[delegate main];\n"
+      main_txt << <<EOS
+    if ( [delegate respondsToSelector:@selector(main:)] ) {
+      [delegate performSelector:@selector(main:) withObject:[[NSProcessInfo processInfo] arguments]];
+    }
+    else {
+      [delegate main];
+    }
+EOD
     else
       main_txt << <<EOS
     NSApplication *app = [NSApplication sharedApplication];
